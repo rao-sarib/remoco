@@ -1,0 +1,11 @@
+# Normalise line endings so the repository is consistent regardless of the
+# platform a contributor or reviewer clones it on.
+* text=auto eol=lf
+
+# Binary assets must never be transformed.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
