@@ -82,10 +82,19 @@ integration, and real-time communication — without a framework doing the work.
 - Per-role reports covering the same ground at the scope that role can see, plus checkpoint
   progress and member workload
 
+### Mobile client (Flutter)
+- Native app covering the same four roles as the web client — Company/Admin, Project Manager,
+  Team Lead, Team Member
+- Talks to a dedicated REST API (`public/api/`) that returns JSON
+- Bearer-token authentication issued at login and attached to every request through a single
+  HTTP wrapper; the server scopes each query to the token's identity, company, and role
+- Real-time chat (Firebase) and video calls (Agora) from the device
+
 ### Cross-cutting
 - Multi-tenant data isolation by company ID, enforced in every task query and mutation
 - Password hashing with `password_hash()` / bcrypt
-- CSRF protection on every authenticated state-changing request
+- CSRF protection on every authenticated state-changing web request; stateless bearer tokens
+  on the mobile API
 - Session hardening: `HttpOnly` / `SameSite` / `Secure` cookies and id regeneration at login
 - Real-time messaging (Firebase Realtime Database)
 - Peer-to-peer video calls (Agora RTC)
@@ -140,17 +149,21 @@ integration, and real-time communication — without a framework doing the work.
 
 ## Architecture
 
+Two clients — a server-rendered web app and a native Flutter app — sit over one PHP backend
+and one MySQL database. The web app renders its own pages and holds a session; the mobile app
+talks to a token-authenticated REST API that returns JSON.
+
 ```mermaid
 graph TB
-    subgraph Client["Browser"]
-        UI["Server-rendered pages<br/>HTML · CSS · vanilla JS · jQuery"]
+    subgraph Clients["Clients"]
+        WEB["Web app<br/>server-rendered · HTML · CSS · vanilla JS · jQuery"]
+        MOB["Mobile app<br/>Flutter · Dart"]
     end
 
-    subgraph App["Application Layer — PHP 8"]
-        AUTH["Authentication<br/>login.php · session guards"]
-        ROLE["Role-based pages<br/>admin · pm · tl · tm"]
-        API["JSON endpoints<br/>file_upload · get_files · video_call"]
-        CFG["config.php<br/>single source of configuration"]
+    subgraph Backend["Backend — PHP 8"]
+        WPAGES["Web pages<br/>login · role dashboards · reports"]
+        API["REST API<br/>public/api · bearer-token auth<br/>login · tasks · chats · files · calls"]
+        CFG["includes/<br/>config · api_config · shared helpers"]
     end
 
     subgraph Data["Persistence"]
@@ -160,37 +173,44 @@ graph TB
 
     subgraph External["Third-party services"]
         FB[("Firebase<br/>Realtime Database")]
-        AG["Agora RTC<br/>WebRTC video"]
+        AG["Agora RTC<br/>video"]
     end
 
-    UI -->|"HTTP POST / GET"| AUTH
-    AUTH -->|"session established"| ROLE
-    UI -->|"AJAX"| API
-    ROLE --> CFG
+    WEB -->|"HTTP · session cookie"| WPAGES
+    MOB -->|"HTTPS · Bearer token (JSON)"| API
+    WPAGES --> CFG
     API --> CFG
-    ROLE -->|"PDO, prepared statements"| DB
-    API -->|"mysqli, prepared statements"| DB
+    WPAGES -->|"PDO, prepared statements"| DB
+    API -->|"PDO, prepared statements"| DB
+    WPAGES --> FS
     API --> FS
-    UI <-->|"WebSocket — messages"| FB
-    UI <-->|"peer media streams"| AG
-    CFG -.->|"injects client config"| UI
+    WEB <-->|"messages"| FB
+    MOB <-->|"messages"| FB
+    WEB <-->|"peer media"| AG
+    MOB <-->|"peer media"| AG
 
     classDef ext fill:#fff4e6,stroke:#f59e0b,color:#000
     classDef data fill:#e6f4ff,stroke:#2563eb,color:#000
+    classDef client fill:#eef2ff,stroke:#4f46e5,color:#000
     class FB,AG ext
     class DB,FS data
+    class WEB,MOB client
 ```
 
-**Request lifecycle.** Every page is a self-contained PHP script. It requires
+**Web request lifecycle.** Every page is a self-contained PHP script. It requires
 `session_bootstrap.php` (which applies the cookie flags, starts the session, and exposes the
 CSRF helpers), enforces its own role guard, loads `includes/config.php`, opens a database
 connection, runs its queries, and renders HTML. There is no front controller and no router —
 navigation is direct links plus a `?page=` query parameter on the dashboards, which the
-shells resolve against an allow-list derived from their own sidebar.
+shells resolve against an allow-list derived from their own sidebar. Cross-cutting concerns
+live in shared includes under `includes/` — session handling, configuration, pagination, and
+report presentation each have one home.
 
-Cross-cutting concerns live in four small shared includes — `session_bootstrap.php`,
-`config.php`, `pagination.php`, and `report_styles.php`, all under `includes/` — so session handling,
-configuration, pagination, and report presentation each have one home.
+**API request lifecycle.** Each mobile endpoint requires `_bootstrap.php`, which loads
+`includes/api_config.php`, opens the database, and exposes the auth helpers. A login endpoint
+mints a stateless, HMAC-signed bearer token; every other endpoint calls `require_auth()`,
+decodes the token, and scopes each query to the caller's identity, company, and role — so the
+mobile client is held to the same tenant and role boundaries as the web client.
 
 ### Data model
 
@@ -364,12 +384,39 @@ php -S localhost:8000 -t public
 # then open http://localhost:8000
 ```
 
+### Mobile client
+
+The Flutter app lives in [`mobile/`](mobile) and talks to the REST API in `public/api/`. It
+needs the Dart toolchain plus its own configuration:
+
+```bash
+cd mobile
+flutter pub get
+
+# Firebase config is git-ignored — copy the templates and fill in your project, or run
+# `flutterfire configure`
+cp lib/firebase_options.dart.example lib/firebase_options.dart
+cp android/app/google-services.example.json android/app/google-services.json
+
+# point the app at your API host (e.g. 10.0.2.2 for an Android emulator)
+#   edit lib/services/api_constants.dart
+
+flutter run
+```
+
+The API needs its own config file (see below). Full detail is in
+[mobile/README.md](mobile/README.md).
+
 ---
 
 ## Configuration
 
-All configuration lives in a single file, `includes/config.php`, created from
-`config.example.php`. Nothing else in the codebase contains credentials.
+The **web app** reads `includes/config.php`; the **mobile API** reads
+`includes/api_config.php`. Both are created from committed `*.example.php` templates, both are
+git-ignored, and both live outside `public/` so they are never reachable over HTTP. Nothing
+else in the codebase contains credentials.
+
+**Web** — `includes/config.php` (from `config.example.php`)
 
 | Setting | Purpose |
 |---|---|
@@ -379,8 +426,18 @@ All configuration lives in a single file, `includes/config.php`, created from
 | `FIREBASE_DATABASE_URL_REGIONAL` | Regional RTDB endpoint, used by chat pages |
 | `AGORA_APP_ID`, `AGORA_TOKEN` | Agora RTC credentials for video calls |
 
+**Mobile API** — `includes/api_config.php` (from `api_config.example.php`)
+
+| Setting | Purpose |
+|---|---|
+| `$host`, `$username`, `$password`, `$dbname` | MySQL connection |
+| `API_TOKEN_SECRET` | Signs the bearer tokens the login endpoints issue — keep secret |
+| `API_TOKEN_TTL` | How long an issued token stays valid (seconds) |
+| `API_ALLOWED_ORIGIN` | Optional CORS origin (never `*`) |
+| `AGORA_APP_ID` | Agora App ID returned to the client for video calls |
+
 Every value may also be supplied as a real environment variable, which takes precedence
-over the file. See [.env.example](.env.example) for the variable names.
+over the file. See [.env.example](.env.example) for the web variable names.
 
 ### Firebase & Agora
 

@@ -106,14 +106,20 @@ permissive server configuration.
 
 ### Requirements
 
+**Backend (web app + REST API)**
 - PHP 8.0+ with `pdo_mysql` and `mysqli`
 - MySQL 5.7+ or MariaDB 10.4+
 - A Firebase project with Realtime Database enabled, for chat
 - An Agora project, for video calling
 
-Chat and video require your own Firebase and Agora credentials in `includes/config.php`. The rest of
-the application — authentication, task management, reporting, file sharing — runs with only a
-database.
+**Mobile client**
+- The Flutter SDK and Dart toolchain (`flutter pub get`, `flutter run`)
+- Its own Firebase configuration (`mobile/lib/firebase_options.dart`) — kept out of version
+  control; copy from the committed template
+
+Chat and video require your own Firebase and Agora credentials — in `includes/config.php` for
+the web app and `includes/api_config.php` for the mobile API. The rest of both clients —
+authentication, task management, reporting, file sharing — runs with only a database.
 
 ---
 
