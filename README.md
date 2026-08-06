@@ -5,10 +5,13 @@
 ### Remote Workforce Management & Collaboration Platform
 
 A multi-tenant team collaboration platform with role-based dashboards, real-time chat,
-peer-to-peer video calling, and checkpoint-based task tracking.
+peer-to-peer video calling, and checkpoint-based task tracking — delivered through a
+server-rendered **web client** and a native **Flutter mobile client** over a shared,
+token-authenticated REST API.
 
 ![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?style=flat-square&logo=php&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-MariaDB-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-Dart-02569B?style=flat-square&logo=flutter&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-Realtime%20DB-FFCA28?style=flat-square&logo=firebase&logoColor=black)
 ![Agora](https://img.shields.io/badge/Agora-WebRTC-099DFD?style=flat-square)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
@@ -20,9 +23,12 @@ peer-to-peer video calling, and checkpoint-based task tracking.
 
 ## Overview
 
-REMOCO is a web platform for distributed teams. A company registers, receives a unique
-company ID, and then onboards employees under one of three roles. Each role gets a
-purpose-built dashboard exposing only the capabilities that role needs.
+REMOCO is a platform for distributed teams, reachable two ways: a server-rendered **web
+app** and a native **Flutter mobile app**, both backed by the same MySQL database. The web
+app renders its own pages in PHP; the mobile app talks to a token-authenticated **REST API**
+(`public/api/`) that returns JSON. A company registers, receives a unique company ID, and
+then onboards employees under one of three roles. Each role gets a purpose-built dashboard
+exposing only the capabilities that role needs.
 
 The interesting part of the domain is the **task delegation chain**. A Project Manager
 creates a task and assigns it to a Team Lead. The Team Lead breaks it into named
@@ -277,19 +283,21 @@ Reference diagrams produced during design:
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Language | PHP 8.2 | No framework; procedural, one script per page |
+| Web language | PHP 8.2 | No framework; procedural, one script per page |
+| Mobile client | Flutter (Dart) | Native app over the REST API in `public/api/` |
 | Database | MySQL / MariaDB | 7 tables, InnoDB, foreign-key constrained |
 | DB access | PDO + mysqli | Prepared statements throughout |
-| Frontend | HTML5, CSS3, vanilla JS | Inline `<style>` per page; CSS custom properties for theming |
+| Web frontend | HTML5, CSS3, vanilla JS | Inline `<style>` per page; CSS custom properties for theming |
 | DOM/AJAX helper | jQuery 3.6 | Chat pages only |
-| Real-time messaging | Firebase Realtime Database 8.10 | Compat SDK via CDN |
-| Video calling | Agora RTC SDK 4.19 | Loaded from Agora CDN |
+| Real-time messaging | Firebase Realtime Database | Web (compat SDK via CDN) and mobile (`firebase_database`) |
+| Video calling | Agora RTC | Web SDK 4.19 via CDN; mobile `agora_rtc_engine` |
 | Icons | Font Awesome 6.4 | CDN |
-| Auth | PHP sessions + `password_hash()` | bcrypt via `PASSWORD_DEFAULT` |
+| Web auth | PHP sessions + `password_hash()` | bcrypt via `PASSWORD_DEFAULT` |
+| API auth | Signed bearer token + `password_hash()` | Stateless HMAC-signed token; no third-party library |
 | Local runtime | XAMPP (Apache + MySQL) | Also runs under `php -S` |
 
-**No build step.** There is no bundler, transpiler, or package manager — clone, configure,
-and serve.
+**No build step for the backend.** No bundler, transpiler, or Composer package — clone,
+configure, and serve. The Flutter client uses the standard Dart toolchain (`flutter pub get`).
 
 ---
 
@@ -430,11 +438,28 @@ database configured.
 │   ├── get_files.php           #   chat file listing
 │   ├── video_call.php          #   initiate Agora session
 │   │
-│   └── uploads/                # Runtime file storage (contents git-ignored)
+│   ├── api/                    # Mobile REST API — token-authenticated ─────
+│   │   ├── _bootstrap.php      #   config, PDO, bearer-token auth, guards
+│   │   ├── company_login.php   #   login endpoints issue a signed token
+│   │   ├── employee_login.php  #
+│   │   ├── get_*.php  create_task.php  assign_task.php  …   role-scoped
+│   │   └── uploads/            #   API file storage (contents git-ignored)
+│   │
+│   └── uploads/                # Web runtime file storage (contents git-ignored)
+│
+├── mobile/                     # Flutter mobile client ─────────────────────
+│   ├── lib/                    #   Dart source (screens, dashboards, services)
+│   │   └── services/
+│   │       └── api_http.dart   #   authenticated HTTP wrapper (bearer token)
+│   ├── android/ ios/ web/ …    #   platform shells
+│   ├── pubspec.yaml            #   dependencies
+│   └── .gitignore              #   excludes build artifacts & Firebase config
 │
 ├── includes/                   # Outside the document root — not web-reachable
-│   ├── config.example.php      #   configuration template (committed)
-│   ├── config.php              #   real configuration (git-ignored)
+│   ├── config.example.php      #   web configuration template (committed)
+│   ├── config.php              #   web configuration (git-ignored)
+│   ├── api_config.example.php  #   API configuration template (committed)
+│   ├── api_config.php          #   API configuration + token secret (git-ignored)
 │   ├── session_bootstrap.php   #   cookie hardening, session start, CSRF helpers
 │   ├── db_connect.php          #   shared mysqli connection + chat-membership guard
 │   ├── pagination.php          #   shared offset pagination for the list views
@@ -477,6 +502,14 @@ tenant-scoped query a join; storing it directly is on the roadmap.
 
 **Assignment slots are explicit.** A task carries `tm1`/`tm2`/`tm3`, and the matching chat
 room mirrors them, so the working group for a task is a single row rather than a join.
+
+**Two clients, one model.** The web app renders pages server-side; the Flutter app consumes a
+JSON REST API (`public/api/`). The API authenticates with a stateless, HMAC-signed bearer
+token minted at login — no session cookies, no third-party JWT library. Every endpoint derives
+the caller's identity, company, and role from that token and scopes each query to it, so the
+mobile client is held to the same tenant and role boundaries as the web client. The mobile app
+attaches the token through one HTTP wrapper (`mobile/lib/services/api_http.dart`) rather than
+per call site.
 
 Full reasoning, plus the planned work in priority order, is in
 [docs/ROADMAP.md](docs/ROADMAP.md).

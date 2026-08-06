@@ -2,6 +2,7 @@
 # Secrets & local configuration  —  NEVER COMMIT THESE
 # ---------------------------------------------------------------------------
 includes/config.php
+includes/api_config.php
 .env
 .env.local
 *.pem
@@ -88,3 +89,7 @@ AgoraRTC_N-4.19.0.js
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx
+
+# API runtime uploads (mirror of public/uploads policy)
+public/api/uploads/*
+!public/api/uploads/.gitkeep

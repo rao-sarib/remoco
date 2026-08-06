@@ -65,6 +65,12 @@ stored file back. Listing and upload both require the caller to be a participant
 mutations carry an ownership predicate in the statement itself rather than relying on an
 earlier check.
 
+**Two clients.** A server-rendered web app and a native Flutter mobile app share the same
+MySQL database. The web app renders pages in PHP; the mobile app consumes a token-authenticated
+JSON REST API (`public/api/`). Login mints a stateless, HMAC-signed bearer token, and every
+API endpoint derives the caller's identity, company, and role from it and scopes each query
+accordingly — the same tenant and role boundaries the web client enforces.
+
 **Security posture**
 - Passwords hashed with `password_hash()` / bcrypt
 - CSRF tokens on every authenticated state-changing request, compared with `hash_equals()`

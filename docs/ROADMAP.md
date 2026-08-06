@@ -43,6 +43,13 @@ another.
 allow-list derived from its own sidebar, giving a single-page feel without a client-side
 framework.
 
+**Two clients over one model.** Alongside the server-rendered web app, a Flutter mobile
+client consumes a JSON REST API (`public/api/`). The API authenticates with a stateless,
+HMAC-signed bearer token issued at login (no session cookies, no third-party JWT library);
+every endpoint derives identity, company, and role from the token and scopes each query to
+it, so both clients share the same tenant and role boundaries. The mobile app attaches the
+token through a single HTTP wrapper (`mobile/lib/services/api_http.dart`).
+
 ---
 
 ## Roadmap

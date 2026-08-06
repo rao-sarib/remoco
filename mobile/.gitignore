@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------------------
+# Flutter / Dart build artifacts — generated, never committed
+# ---------------------------------------------------------------------------
+/build/
+**/build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+pubspec_overrides.yaml
+
+# ---------------------------------------------------------------------------
+# Machine-specific / local configuration
+# ---------------------------------------------------------------------------
+local.properties
+**/local.properties
+*.log
+pglite-debug.log
+
+# ---------------------------------------------------------------------------
+# IDE / editor
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.gradle/
+**/.gradle/
+
+# ---------------------------------------------------------------------------
+# Android
+# ---------------------------------------------------------------------------
+**/android/**/gradle-wrapper.jar
+**/android/.gradle/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/key.properties
+**/*.keystore
+**/*.jks
+**/GeneratedPluginRegistrant.*
+
+# ---------------------------------------------------------------------------
+# iOS / macOS
+# ---------------------------------------------------------------------------
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/ephemeral/
+**/ios/Pods/
+**/ios/.symlinks/
+**/Podfile.lock
+**/macos/Flutter/ephemeral/
+**/macos/Pods/
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# Firebase — client config is delivered to the app; keep out of version control
+# so the repository does not pin a specific project.
+# ---------------------------------------------------------------------------
+**/google-services.json
+**/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# ---------------------------------------------------------------------------
+# Symbolication / obfuscation
+# ---------------------------------------------------------------------------
+app.*.symbols
+app.*.map.json
+
+# FlutterFire manifest — pins the project; keep out of VCS
+firebase.json

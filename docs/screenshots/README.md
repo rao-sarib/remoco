@@ -87,5 +87,7 @@ the system. Files are named `<area>-<view>.png`.
 
 ## Scope
 
-REMOCO is a responsive web application; there is no separate mobile client, so the captures
-above cover the full surface. Every capture is from a local instance running test data.
+These captures are of the web client. REMOCO also has a native Flutter mobile client
+(see [`mobile/`](../../mobile)) that talks to the same platform through a dedicated REST API;
+mobile captures are not included here. Every capture above is from a local instance running
+test data.
